@@ -1,9 +1,8 @@
-// ================= ELEMENTOS =================
+// ================= MENU =================
 const menu = document.getElementById("menu");
 const assistente = document.getElementById("assistente");
 const afinador = document.getElementById("afinador");
 
-// BOTÕES
 document.getElementById("btnAssistente").onclick = () => {
   menu.classList.add("hidden");
   assistente.classList.remove("hidden");
@@ -17,9 +16,8 @@ document.getElementById("btnAfinador").onclick = () => {
 document.getElementById("btnVoltar1").onclick = voltar;
 document.getElementById("btnVoltar2").onclick = voltar;
 
-// ================= VOLTAR =================
 function voltar() {
-  stop();
+  stopAssistente();
   stopTuner();
 
   assistente.classList.add("hidden");
@@ -39,48 +37,40 @@ const startBtn = document.getElementById("startBtn");
 const statusEl = document.getElementById("status");
 
 startBtn.onclick = async () => {
-  if (isRunning) stop();
-  else await start();
+  if (isRunning) stopAssistente();
+  else await startAssistente();
 };
 
-async function start() {
-  try {
-    statusEl.innerText = "Iniciando...";
+async function startAssistente() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const ctx = new AudioContext();
+  const source = ctx.createMediaStreamSource(stream);
 
-    const ctx = new AudioContext();
-    const source = ctx.createMediaStreamSource(stream);
+  analyser = Meyda.createMeydaAnalyzer({
+    audioContext: ctx,
+    source,
+    bufferSize: 1024,
+    featureExtractors: ["chroma"],
+    callback: f => {
+      if (!f?.chroma) return;
+      for (let i = 0; i < 12; i++) chromaBuffer[i] += f.chroma[i];
+    }
+  });
 
-    analyser = Meyda.createMeydaAnalyzer({
-      audioContext: ctx,
-      source,
-      bufferSize: 1024,
-      featureExtractors: ["chroma"],
-      callback: f => {
-        if (!f?.chroma) return;
-        for (let i = 0; i < 12; i++) chromaBuffer[i] += f.chroma[i];
-      }
-    });
+  analyser.start();
+  intervalId = setInterval(detectKey, 5000);
 
-    analyser.start();
-
-    intervalId = setInterval(detectKey, 5000);
-
-    statusEl.innerText = "🎤 Escutando...";
-    isRunning = true;
-
-  } catch (e) {
-    statusEl.innerText = "Erro no microfone";
-  }
+  statusEl.innerText = "🎤 Escutando...";
+  isRunning = true;
 }
 
-function stop() {
+function stopAssistente() {
   analyser?.stop();
   clearInterval(intervalId);
   chromaBuffer.fill(0);
-  isRunning = false;
   statusEl.innerText = "Parado";
+  isRunning = false;
 }
 
 function detectKey() {
@@ -90,15 +80,7 @@ function detectKey() {
   let idx = chromaBuffer.indexOf(Math.max(...chromaBuffer));
   let tonic = NOTE_NAMES[idx];
 
-  const maj = [0,2,4,5,7,9,11];
-  const min = [0,2,3,5,7,8,10];
-
-  const build = s => s.map(v => (idx+v)%12);
-  const score = s => s.reduce((sum,i)=>sum+chromaBuffer[i],0);
-
-  let type = score(build(maj)) > score(build(min)) ? "Maior" : "Menor";
-
-  document.getElementById("key").innerText = `${tonic} ${type}`;
+  document.getElementById("key").innerText = tonic;
   document.getElementById("confidence").innerText = "Detectando...";
   document.getElementById("fill").style.width = "70%";
 
@@ -121,7 +103,6 @@ tunerBtn.onclick = async () => {
   } else {
     stopTuner();
     tunerBtn.innerText = "Iniciar Afinador";
-    tunerRunning = false;
   }
 };
 
@@ -146,15 +127,20 @@ function stopTuner() {
 }
 
 function detectPitch() {
-  if (!analyserT) return;
+  if (!tunerRunning) return;
 
   analyserT.getFloatTimeDomainData(data);
 
   let freq = autoCorrelate(data, audioCtx.sampleRate);
 
   if (freq !== -1) {
-    document.getElementById("tunerFreq").innerText = freq.toFixed(1) + " Hz";
-    document.getElementById("tunerNote").innerText = freqToNote(freq);
+    let noteData = getNoteData(freq);
+
+    document.getElementById("note").innerText = noteData.note;
+    document.getElementById("freq").innerText = freq.toFixed(1) + " Hz";
+    document.getElementById("cents").innerText = noteData.cents + " cents";
+
+    updateNeedle(noteData.cents);
   }
 
   requestAnimationFrame(detectPitch);
@@ -181,11 +167,29 @@ function autoCorrelate(buf, sr) {
   return best > 0 ? sr / best : -1;
 }
 
-function freqToNote(freq) {
+function getNoteData(freq) {
   const notes = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
   let n = 12 * (Math.log(freq/440)/Math.log(2));
   n = Math.round(n) + 69;
 
-  return notes[n%12] + (Math.floor(n/12)-1);
+  let perfect = 440 * Math.pow(2,(n-69)/12);
+  let cents = Math.floor(1200 * Math.log2(freq/perfect));
+
+  return {
+    note: notes[n%12] + (Math.floor(n/12)-1),
+    cents
+  };
+}
+
+function updateNeedle(cents) {
+  let max = 50;
+  if (cents > max) cents = max;
+  if (cents < -max) cents = -max;
+
+  let percent = (cents + 50) / 100;
+  document.getElementById("needle").style.left = (percent * 100) + "%";
+
+  document.getElementById("needle").style.background =
+    Math.abs(cents) < 5 ? "lime" : "red";
 }

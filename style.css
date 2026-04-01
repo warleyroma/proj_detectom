@@ -4,81 +4,108 @@
 
 body {
   margin: 0;
-  background: #0f172a;
-  color: #fff;
-  font-family: Arial, sans-serif;
+  background: black;
+  color: #00ff66;
+  font-family: Arial;
+  text-align: center;
 }
 
 .container {
   max-width: 600px;
   margin: auto;
   padding: 20px;
-  text-align: center;
 }
 
 .hidden {
   display: none;
 }
 
-h1 {
-  font-size: 24px;
-}
-
-h2 {
-  margin-top: 20px;
-}
-
 button {
   width: 100%;
-  padding: 16px;
+  padding: 15px;
   font-size: 18px;
-  border-radius: 12px;
+  border-radius: 10px;
   border: none;
-  background: #22c55e;
+  background: #00aa44;
   color: white;
   margin-top: 10px;
-  cursor: pointer;
 }
 
+/* ASSISTENTE */
 #status {
   margin-top: 10px;
-  color: #facc15;
+  color: yellow;
 }
 
 #key {
   margin-top: 20px;
-  font-size: 20px;
-  white-space: pre-line;
+  font-size: 22px;
 }
 
 #confidence {
-  margin-top: 10px;
-  color: #94a3b8;
+  color: gray;
 }
 
 .bar {
-  margin-top: 15px;
   height: 10px;
-  background: #1e293b;
-  border-radius: 10px;
+  background: #222;
+  margin-top: 10px;
 }
 
 .fill {
   height: 100%;
   width: 0%;
-  background: #22c55e;
+  background: lime;
 }
 
 #chords {
   margin-top: 20px;
-  color: #22c55e;
 }
 
-#tunerNote {
-  font-size: 48px;
+/* AFINADOR */
+#note {
+  font-size: 100px;
   margin-top: 20px;
 }
 
-#tunerFreq {
-  color: #94a3b8;
+#freq {
+  font-size: 20px;
+}
+
+.meter {
+  position: relative;
+  width: 90%;
+  height: 6px;
+  background: #222;
+  margin: 30px auto;
+}
+
+.center-line {
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  height: 20px;
+  background: white;
+  top: -7px;
+}
+
+#needle {
+  position: absolute;
+  width: 4px;
+  height: 25px;
+  background: red;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  width: 90%;
+  margin: auto;
+}
+
+#cents {
+  margin-top: 10px;
 }

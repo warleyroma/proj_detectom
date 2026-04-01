@@ -1,3 +1,33 @@
+// ================= ELEMENTOS =================
+const menu = document.getElementById("menu");
+const assistente = document.getElementById("assistente");
+const afinador = document.getElementById("afinador");
+
+// BOTÕES
+document.getElementById("btnAssistente").onclick = () => {
+  menu.classList.add("hidden");
+  assistente.classList.remove("hidden");
+};
+
+document.getElementById("btnAfinador").onclick = () => {
+  menu.classList.add("hidden");
+  afinador.classList.remove("hidden");
+};
+
+document.getElementById("btnVoltar1").onclick = voltar;
+document.getElementById("btnVoltar2").onclick = voltar;
+
+// ================= VOLTAR =================
+function voltar() {
+  stop();
+  stopTuner();
+
+  assistente.classList.add("hidden");
+  afinador.classList.add("hidden");
+  menu.classList.remove("hidden");
+}
+
+// ================= ASSISTENTE =================
 let chromaBuffer = new Array(12).fill(0);
 let analyser;
 let intervalId;
@@ -5,40 +35,31 @@ let isRunning = false;
 
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
-const btn = document.getElementById("startBtn");
+const startBtn = document.getElementById("startBtn");
 const statusEl = document.getElementById("status");
 
-btn.addEventListener("click", toggle);
-
-async function toggle() {
-  if (isRunning) {
-    stop();
-  } else {
-    await start();
-  }
-}
+startBtn.onclick = async () => {
+  if (isRunning) stop();
+  else await start();
+};
 
 async function start() {
   try {
-    statusEl.innerText = "Status: Iniciando...";
-    btn.innerText = "Parar";
+    statusEl.innerText = "Iniciando...";
 
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-    const audioContext = new AudioContext();
-    const source = audioContext.createMediaStreamSource(stream);
+    const ctx = new AudioContext();
+    const source = ctx.createMediaStreamSource(stream);
 
     analyser = Meyda.createMeydaAnalyzer({
-      audioContext: audioContext,
-      source: source,
+      audioContext: ctx,
+      source,
       bufferSize: 1024,
       featureExtractors: ["chroma"],
-      callback: features => {
-        if (!features || !features.chroma) return;
-
-        for (let i = 0; i < 12; i++) {
-          chromaBuffer[i] += features.chroma[i];
-        }
+      callback: f => {
+        if (!f?.chroma) return;
+        for (let i = 0; i < 12; i++) chromaBuffer[i] += f.chroma[i];
       }
     });
 
@@ -49,118 +70,122 @@ async function start() {
     statusEl.innerText = "🎤 Escutando...";
     isRunning = true;
 
-  } catch (err) {
-    statusEl.innerText = "❌ Erro no microfone";
-    console.error(err);
+  } catch (e) {
+    statusEl.innerText = "Erro no microfone";
   }
 }
 
 function stop() {
-  if (analyser) analyser.stop();
+  analyser?.stop();
   clearInterval(intervalId);
-
   chromaBuffer.fill(0);
-
-  statusEl.innerText = "⏹️ Parado";
-  btn.innerText = "Iniciar";
   isRunning = false;
+  statusEl.innerText = "Parado";
 }
 
 function detectKey() {
-  let totalEnergy = chromaBuffer.reduce((a,b) => a+b, 0);
+  let total = chromaBuffer.reduce((a,b)=>a+b,0);
+  if (total < 0.01) return;
 
-  // DEBUG: mostrar se está captando som
-  if (totalEnergy < 0.01) {
-    statusEl.innerText = "🔇 Sem som detectado...";
-    return;
-  } else {
-    statusEl.innerText = "🎤 Escutando som...";
-  }
+  let idx = chromaBuffer.indexOf(Math.max(...chromaBuffer));
+  let tonic = NOTE_NAMES[idx];
 
-  let tonicIndex = chromaBuffer.indexOf(Math.max(...chromaBuffer));
-  let tonic = NOTE_NAMES[tonicIndex];
+  const maj = [0,2,4,5,7,9,11];
+  const min = [0,2,3,5,7,8,10];
 
-  const majorSteps = [0,2,4,5,7,9,11];
-  const minorSteps = [0,2,3,5,7,8,10];
+  const build = s => s.map(v => (idx+v)%12);
+  const score = s => s.reduce((sum,i)=>sum+chromaBuffer[i],0);
 
-  function buildScale(rootIndex, steps) {
-    return steps.map(s => (rootIndex + s) % 12);
-  }
+  let type = score(build(maj)) > score(build(min)) ? "Maior" : "Menor";
 
-  let majorScale = buildScale(tonicIndex, majorSteps);
-  let minorScale = buildScale(tonicIndex, minorSteps);
-
-  function scoreScale(scale) {
-    return scale.reduce((sum, i) => sum + chromaBuffer[i], 0);
-  }
-
-  let majorScore = scoreScale(majorScale);
-  let minorScore = scoreScale(minorScale);
-
-  let type = majorScore > minorScore ? "Maior" : "Menor";
-
-  let confidence = Math.max(majorScore, minorScore) / totalEnergy * 100;
-  confidence = Math.min(100, confidence);
-
-  let relative = getRelative(tonic, type);
-
-  document.getElementById("key").innerText =
-    `🎯 Tônica: ${tonic}\n🎵 Tonalidade: ${tonic} ${type}\n🔁 Relativo: ${relative}`;
-
-  document.getElementById("confidence").innerText =
-    "Confiança: " + confidence.toFixed(1) + "%";
-
-  document.getElementById("fill").style.width = confidence + "%";
-
-  let chords = getField(tonic, type);
-
-  document.getElementById("chords").innerText =
-    `🎸 Campo harmônico:\n\n` +
-    chords.join("   •   ");
+  document.getElementById("key").innerText = `${tonic} ${type}`;
+  document.getElementById("confidence").innerText = "Detectando...";
+  document.getElementById("fill").style.width = "70%";
 
   chromaBuffer = chromaBuffer.map(v => v * 0.6);
 }
 
-function getRelative(tonic, type) {
-  let index = NOTE_NAMES.indexOf(tonic);
+// ================= AFINADOR =================
+let audioCtx;
+let analyserT;
+let data;
+let tunerRunning = false;
 
-  if (type === "Maior") {
-    return NOTE_NAMES[(index + 9) % 12] + " Menor";
+const tunerBtn = document.getElementById("tunerBtn");
+
+tunerBtn.onclick = async () => {
+  if (!tunerRunning) {
+    await startTuner();
+    tunerBtn.innerText = "Parar Afinador";
+    tunerRunning = true;
   } else {
-    return NOTE_NAMES[(index + 3) % 12] + " Maior";
+    stopTuner();
+    tunerBtn.innerText = "Iniciar Afinador";
+    tunerRunning = false;
   }
+};
+
+async function startTuner() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  audioCtx = new AudioContext();
+  const source = audioCtx.createMediaStreamSource(stream);
+
+  analyserT = audioCtx.createAnalyser();
+  analyserT.fftSize = 2048;
+
+  source.connect(analyserT);
+  data = new Float32Array(analyserT.fftSize);
+
+  detectPitch();
 }
 
-function getField(root, type) {
-  const notes = NOTE_NAMES;
+function stopTuner() {
+  audioCtx?.close();
+  tunerRunning = false;
+}
 
-  const majorSteps = [0,2,4,5,7,9,11];
-  const minorSteps = [0,2,3,5,7,8,10];
+function detectPitch() {
+  if (!analyserT) return;
 
-  let index = notes.indexOf(root);
+  analyserT.getFloatTimeDomainData(data);
 
-  let scale = (type === "Maior" ? majorSteps : minorSteps)
-    .map(step => notes[(index + step) % 12]);
+  let freq = autoCorrelate(data, audioCtx.sampleRate);
 
-  if (type === "Maior") {
-    return [
-      scale[0],
-      scale[1]+"m",
-      scale[2]+"m",
-      scale[3],
-      scale[4],
-      scale[5]+"m",
-      scale[6]+"dim"
-    ];
-  } else {
-    return [
-      scale[0]+"m",
-      scale[1]+"dim",
-      scale[2],
-      scale[3]+"m",
-      scale[4]+"m",
-      scale[5],
-      scale[6]
-    ];
+  if (freq !== -1) {
+    document.getElementById("tunerFreq").innerText = freq.toFixed(1) + " Hz";
+    document.getElementById("tunerNote").innerText = freqToNote(freq);
   }
+
+  requestAnimationFrame(detectPitch);
+}
+
+function autoCorrelate(buf, sr) {
+  let SIZE = buf.length;
+  let best = -1;
+  let bestCorr = 0;
+
+  for (let offset = 8; offset < 1000; offset++) {
+    let corr = 0;
+    for (let i = 0; i < SIZE - offset; i++) {
+      corr += buf[i] * buf[i + offset];
+    }
+    corr /= SIZE;
+
+    if (corr > bestCorr) {
+      bestCorr = corr;
+      best = offset;
+    }
+  }
+
+  return best > 0 ? sr / best : -1;
+}
+
+function freqToNote(freq) {
+  const notes = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+
+  let n = 12 * (Math.log(freq/440)/Math.log(2));
+  n = Math.round(n) + 69;
+
+  return notes[n%12] + (Math.floor(n/12)-1);
 }

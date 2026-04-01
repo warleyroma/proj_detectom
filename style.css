@@ -16,89 +16,69 @@ body {
   text-align: center;
 }
 
-/* Título */
-h1 {
-  font-size: 24px;
-  margin-bottom: 20px;
+.hidden {
+  display: none;
 }
 
-/* Botão */
+h1 {
+  font-size: 24px;
+}
+
+h2 {
+  margin-top: 20px;
+}
+
 button {
   width: 100%;
   padding: 16px;
-  font-size: 20px;
+  font-size: 18px;
   border-radius: 12px;
   border: none;
   background: #22c55e;
   color: white;
+  margin-top: 10px;
   cursor: pointer;
 }
 
-/* Tonalidade */
-#key {
-  margin-top: 25px;
-  font-size: 22px;
-  white-space: pre-line;
-  letter-spacing: 1px;
+#status {
+  margin-top: 10px;
+  color: #facc15;
 }
 
-/* Confiança */
+#key {
+  margin-top: 20px;
+  font-size: 20px;
+  white-space: pre-line;
+}
+
 #confidence {
   margin-top: 10px;
-  font-size: 16px;
   color: #94a3b8;
 }
 
-/* Barra */
 .bar {
-  margin-top: 20px;
-  height: 12px;
-  width: 100%;
+  margin-top: 15px;
+  height: 10px;
   background: #1e293b;
   border-radius: 10px;
-  overflow: hidden;
 }
 
 .fill {
   height: 100%;
   width: 0%;
   background: #22c55e;
-  transition: width 0.3s;
 }
 
-/* Campo harmônico */
 #chords {
-  margin-top: 25px;
-  font-size: 20px;
-  line-height: 1.8;
+  margin-top: 20px;
   color: #22c55e;
-  white-space: pre-line;
-  letter-spacing: 1px;
 }
 
-/* Mobile */
-@media (max-width: 480px) {
-
-  h1 {
-    font-size: 20px;
-  }
-
-  #key {
-    font-size: 20px;
-  }
-
-  #chords {
-    font-size: 18px;
-  }
-
-  button {
-    font-size: 18px;
-    padding: 14px;
-  }
+#tunerNote {
+  font-size: 48px;
+  margin-top: 20px;
 }
 
-#status {
-  margin-top: 15px;
-  font-size: 16px;
-  color: #facc15;
+#tunerFreq {
+  color: #94a3b8;
 }

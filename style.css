@@ -76,7 +76,7 @@ button {
   letter-spacing: 1px;
 }
 
-/* 📱 Mobile */
+/* Mobile */
 @media (max-width: 480px) {
 
   h1 {
@@ -95,4 +95,10 @@ button {
     font-size: 18px;
     padding: 14px;
   }
+}
+
+#status {
+  margin-top: 15px;
+  font-size: 16px;
+  color: #facc15;
 }

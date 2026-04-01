@@ -89,33 +89,28 @@ async function start() {
 }
 
 function detectKey() {
-  let bestScore = -Infinity;
-  let bestKey = "";
+  let results = [];
 
   for (let i = 0; i < 12; i++) {
     let majorScore = correlation(rotate(MAJOR_PROFILE, i), chromaBuffer);
     let minorScore = correlation(rotate(MINOR_PROFILE, i), chromaBuffer);
 
-    if (majorScore > bestScore) {
-      bestScore = majorScore;
-      bestKey = NOTE_NAMES[i] + " Maior";
-    }
-
-    if (minorScore > bestScore) {
-      bestScore = minorScore;
-      bestKey = NOTE_NAMES[i] + " Menor";
-    }
+    results.push({ key: NOTE_NAMES[i] + " Maior", score: majorScore });
+    results.push({ key: NOTE_NAMES[i] + " Menor", score: minorScore });
   }
 
-  let totalEnergy = chromaBuffer.reduce((a, b) => a + b, 0);
-  let confidence = totalEnergy
-    ? Math.min(100, (bestScore / totalEnergy) * 100)
-    : 0;
+  results.sort((a, b) => b.score - a.score);
 
-  document.getElementById("key").innerText = bestKey || "--";
-  document.getElementById("confidence").innerText =
-    "Confiança: " + confidence.toFixed(1) + "%";
-  document.getElementById("fill").style.width = confidence + "%";
+  let top3 = results.slice(0, 3);
+
+  let totalEnergy = chromaBuffer.reduce((a,b) => a+b, 0);
+
+  let output = top3.map(r => {
+    let conf = totalEnergy ? ((r.score / totalEnergy) * 100).toFixed(1) : 0;
+    return `${r.key} (${conf}%)`;
+  }).join("\n");
+
+  document.getElementById("key").innerText = output;
 
   chromaBuffer.fill(0);
 }

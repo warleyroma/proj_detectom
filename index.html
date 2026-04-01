@@ -1,30 +1,38 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
   <meta charset="UTF-8">
-  <title>Detector de Tonalidade</title>
+  <title>Assistente de Violão</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-  <h1>🎵 Detector de Tonalidade</h1>
-  <button id="startBtn">Iniciar</button>
+  <div class="container">
 
-  <div id="key">--</div>
-  <div id="confidence">Confiança: --</div>
+    <h1>🎸 Assistente de Violão</h1>
 
-  <div class="bar">
-    <div class="fill" id="fill"></div>
+    <button id="startBtn">Iniciar</button>
+
+    <div id="key">--</div>
+
+    <div id="confidence">Confiança: --</div>
+
+    <div class="bar">
+      <div class="fill" id="fill"></div>
+    </div>
+
+    <div id="chords"></div>
+
   </div>
 
-  <!-- Biblioteca -->
+  <!-- Biblioteca de áudio -->
   <script src="https://unpkg.com/meyda/dist/web/meyda.min.js"></script>
 
-  <!-- Seu JS -->
+  <!-- Seu script -->
   <script src="script.js"></script>
 
 </body>
-
 </html>

@@ -1,41 +1,58 @@
+* {
+  box-sizing: border-box;
+}
+
 body {
+  margin: 0;
   background: #0f172a;
   color: #fff;
-  font-family: Arial;
+  font-family: Arial, sans-serif;
+}
+
+.container {
+  max-width: 600px;
+  margin: auto;
+  padding: 20px;
   text-align: center;
-  padding: 40px;
 }
 
+/* Título */
 h1 {
-  font-size: 28px;
+  font-size: 24px;
+  margin-bottom: 20px;
 }
 
+/* Botão */
 button {
-  padding: 12px 25px;
-  font-size: 18px;
-  margin-top: 20px;
-  cursor: pointer;
-  border-radius: 10px;
+  width: 100%;
+  padding: 16px;
+  font-size: 20px;
+  border-radius: 12px;
   border: none;
   background: #22c55e;
   color: white;
+  cursor: pointer;
 }
 
+/* Tonalidade */
 #key {
-  font-size: 40px;
-  margin-top: 30px;
-  font-weight: bold;
+  margin-top: 25px;
+  font-size: 22px;
+  white-space: pre-line;
+  letter-spacing: 1px;
 }
 
+/* Confiança */
 #confidence {
   margin-top: 10px;
-  font-size: 18px;
+  font-size: 16px;
   color: #94a3b8;
 }
 
+/* Barra */
 .bar {
-  margin-top: 30px;
-  height: 20px;
+  margin-top: 20px;
+  height: 12px;
   width: 100%;
   background: #1e293b;
   border-radius: 10px;
@@ -47,4 +64,35 @@ button {
   width: 0%;
   background: #22c55e;
   transition: width 0.3s;
+}
+
+/* Campo harmônico */
+#chords {
+  margin-top: 25px;
+  font-size: 20px;
+  line-height: 1.8;
+  color: #22c55e;
+  white-space: pre-line;
+  letter-spacing: 1px;
+}
+
+/* 📱 Mobile */
+@media (max-width: 480px) {
+
+  h1 {
+    font-size: 20px;
+  }
+
+  #key {
+    font-size: 20px;
+  }
+
+  #chords {
+    font-size: 18px;
+  }
+
+  button {
+    font-size: 18px;
+    padding: 14px;
+  }
 }

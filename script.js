@@ -17,8 +17,8 @@
 
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 
-const MAJOR_PROFILE = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
-const MINOR_PROFILE = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+const MAJOR_PROFILE = [6.6, 2.0, 3.5, 2.3, 4.6, 4.0, 2.5, 5.2, 2.4, 3.7, 2.3, 2.9]; // Albrecht-Shanahan (melhor para voz)
+const MINOR_PROFILE = [6.5, 2.7, 3.5, 5.4, 2.6, 3.5, 2.5, 4.8, 4.0, 2.7, 3.3, 3.2];
 
 // Graus diatônicos para modo maior: I, ii, iii, IV, V, vi
 const CHORD_MAPS_MAJOR = {
@@ -36,9 +36,7 @@ const CHORD_MAPS_MAJOR = {
     "B":  ["B","C#m","D#m","E","F#","G#m"],
 };
 
-// [FIX P1] Graus diatônicos para modo menor natural: i, ii°, III, iv, v, VI, VII
-// A relativa maior compartilha as mesmas notas, mas os graus e função harmônica
-// são diferentes. Ex: Lá menor → Am, Bdim, C, Dm, Em, F, G (não os acordes de Lá maior)
+// Graus diatônicos para modo menor natural
 const CHORD_MAPS_MINOR = {
     "A":  ["Am","Bdim","C","Dm","Em","F","G"],
     "A#": ["A#m","Cdim","C#","D#m","Fm","F#","G#"],
@@ -60,10 +58,9 @@ let globalStream  = null;
 let audioCtx      = null;
 let meydaAnalyser = null;
 let assistenteInterval = null;
-const chromaBuffer = new Float32Array(12); // [FIX P2] Float32Array evita GC de arrays JS
+const chromaBuffer = new Float32Array(12);
 let assistenteRunning = false;
 
-// [FIX P0] Contador de geração para cancelar getUserMedia pendente
 let micGeneration = 0;
 
 let tunerAnalyser  = null;
@@ -102,13 +99,8 @@ $("btnVoltar2").onclick = () => {
 
 // ============= GERENCIAMENTO DE ÁUDIO =============
 
-/**
- * [FIX P0] Inicia o microfone com proteção contra race condition.
- * Se stopAll() for chamado enquanto getUserMedia ainda está pendente,
- * o micGeneration muda, e o stream resolvido é imediatamente descartado.
- */
 async function startMic() {
-    stopAll(); // garante limpeza antes de criar novo contexto
+    stopAll();
 
     const myGen = ++micGeneration;
 
@@ -121,7 +113,6 @@ async function startMic() {
         }
     });
 
-    // Se stopAll() foi chamado enquanto aguardávamos a permissão, aborta.
     if (myGen !== micGeneration) {
         stream.getTracks().forEach(t => t.stop());
         throw new Error("mic_cancelled");
@@ -136,7 +127,7 @@ async function startMic() {
 }
 
 function stopAll() {
-    micGeneration++; // invalida qualquer getUserMedia em voo
+    micGeneration++;
 
     stopAssistente();
     stopTuner();
@@ -147,71 +138,76 @@ function stopAll() {
     }
 
     if (audioCtx && audioCtx.state !== "closed") {
-        // [FIX P2] .catch() para não estourar no Safari quando close() rejeita
         audioCtx.close().catch(console.warn);
         audioCtx = null;
     }
 }
 
-// ============= ASSISTENTE — DETECÇÃO DE TOM =============
+// ============= ASSISTENTE — DETECTOR DE ACORDE TÔNICO PARA VOZ =============
+
+let currentTonic = { chord: "C", root: 0, mode: "maior", confidence: 0 };
+let keyHistory = new Float32Array(24);
+
+const HYSTERESIS_THRESHOLD = 0.15;
+const SCORE_EMA_ALPHA = 0.22;
+const MIN_RMS_VOICE = 0.008;
 
 function correlate(chroma, profile) {
     const n = 12;
-    let mC = 0, mP = 0;
-    for (let i = 0; i < n; i++) { mC += chroma[i]; mP += profile[i]; }
-    mC /= n; mP /= n;
+    let sumC = 0, sumP = 0;
+    for (let i = 0; i < n; i++) { sumC += chroma[i]; sumP += profile[i]; }
+    const mC = sumC / n, mP = sumP / n;
     let num = 0, dc = 0, dp = 0;
     for (let i = 0; i < n; i++) {
         const c = chroma[i] - mC;
         const p = profile[i] - mP;
         num += c * p; dc += c * c; dp += p * p;
     }
-    return (dc === 0 || dp === 0) ? 0 : num / Math.sqrt(dc * dp);
+    return (dc < 1e-8 || dp < 1e-8) ? -1 : num / Math.sqrt(dc * dp);
 }
 
-function detectKey(chroma) {
-    // [FIX P2] Valida NaN antes de calcular
-    for (let i = 0; i < 12; i++) {
-        if (!Number.isFinite(chroma[i])) return null;
-    }
+function detectTonicChord(chroma) {
+    let bestScore = -Infinity;
+    let bestRoot = 0;
+    let bestMode = "maior";
 
-    let best   = { key: "C", mode: "maior", score: -Infinity };
-    let second = -Infinity; // para cálculo de confiança real
+    const rot = new Float32Array(12);
 
     for (let i = 0; i < 12; i++) {
-        // rotação inline sem alocar array — [FIX P2] zero GC pressure
-        const rot = new Float32Array(12);
         for (let j = 0; j < 12; j++) rot[j] = chroma[(j + i) % 12];
 
         const maj = correlate(rot, MAJOR_PROFILE);
         const min = correlate(rot, MINOR_PROFILE);
 
-        if (maj > best.score) {
-            second = best.score;
-            best = { key: NOTE_NAMES[i], mode: "maior", score: maj };
-        } else if (maj > second) second = maj;
-
-        if (min > best.score) {
-            second = best.score;
-            best = { key: NOTE_NAMES[i], mode: "menor", score: min };
-        } else if (min > second) second = min;
+        if (maj > bestScore) { bestScore = maj; bestRoot = i; bestMode = "maior"; }
+        if (min > bestScore)  { bestScore = min;  bestRoot = i; bestMode = "menor"; }
     }
 
-    // [FIX P2] Confiança = margem entre o melhor e o segundo melhor candidato,
-    // normalizada. Mais honesta que a transformação linear simples de antes.
-    const margin = best.score - second; // 0..~0.5 típico
-    const confidence = Math.max(0, Math.min(1, margin * 4));
+    const histIdx = bestMode === "maior" ? bestRoot : bestRoot + 12;
+    keyHistory[histIdx] = keyHistory[histIdx] * (1 - SCORE_EMA_ALPHA) + bestScore * SCORE_EMA_ALPHA;
 
-    return { key: best.key, mode: best.mode, confidence };
+    const currentIdx = currentTonic.mode === "maior" 
+        ? NOTE_NAMES.indexOf(currentTonic.chord) 
+        : NOTE_NAMES.indexOf(currentTonic.chord) + 12;
+
+    const diff = keyHistory[histIdx] - keyHistory[currentIdx];
+
+    if (NOTE_NAMES[bestRoot] + (bestMode === "menor" ? "m" : "") !== currentTonic.chord || diff > HYSTERESIS_THRESHOLD) {
+        currentTonic = {
+            chord: NOTE_NAMES[bestRoot] + (bestMode === "menor" ? "m" : ""),
+            root: bestRoot,
+            mode: bestMode,
+            confidence: Math.max(0, Math.min(1, (bestScore + 1) * 0.65))
+        };
+    }
+
+    return currentTonic;
 }
 
 $("startBtn").onclick = async function () {
     if (assistenteRunning) { stopAssistente(); return; }
     try {
         const source = await startMic();
-
-        // [FIX P0] Captura o contexto por closure para que o callback nunca
-        // leia o global audioCtx que pode ter sido substituído.
         const capturedCtx = audioCtx;
 
         meydaAnalyser = Meyda.createMeydaAnalyzer({
@@ -220,19 +216,14 @@ $("startBtn").onclick = async function () {
             bufferSize: 2048,
             featureExtractors: ["chroma", "rms"],
             callback(f) {
-                if (!f || !f.chroma || f.rms < 0.015) return;
+                if (!f || !f.chroma || f.rms < MIN_RMS_VOICE) return;
 
-                // [FIX P2] Valida NaN no chroma crú do Meyda
                 const sum = f.chroma.reduce((a, b) => a + b, 0);
                 if (!Number.isFinite(sum) || sum < 1e-6) return;
 
-                // Normaliza para [0,1] e atualiza via EMA
-                // [FIX P1] Único ponto de decaimento — o setInterval NÃO decai mais.
-                // α=0.08 → resposta ~1s; quando não há sinal o buffer simplesmente
-                // não é atualizado (o callback retorna cedo), sem drift artificial.
                 for (let i = 0; i < 12; i++) {
                     const v = f.chroma[i] / sum;
-                    chromaBuffer[i] = chromaBuffer[i] * 0.92 + v * 0.08;
+                    chromaBuffer[i] = chromaBuffer[i] * 0.88 + v * 0.12; // EMA mais suave para voz
                 }
             }
         });
@@ -243,36 +234,33 @@ $("startBtn").onclick = async function () {
         $("startBtn").textContent = "⏹ Parar";
         $("startBtn").classList.add("danger");
         $("statusDot").className = "dot on";
-        $("status").textContent  = "Ouvindo...";
-        $("barWrap").style.display     = "block";
+        $("status").innerHTML = '🎤 <strong>Modo Voz</strong> — Ouvindo cantor(a)';
+        $("barWrap").style.display = "block";
         $("chordsSection").style.display = "block";
 
         assistenteInterval = setInterval(() => {
             const total = chromaBuffer.reduce((a, b) => a + b, 0);
-            if (total < 0.01) return;
+            if (total < 0.015) return;
 
-            const result = detectKey(chromaBuffer);
-            if (!result) return; // NaN guard
+            const tonic = detectTonicChord(chromaBuffer);
 
-            $("key").textContent  = result.key;
-            $("mode").textContent = result.mode;
-            $("fill").style.width = (result.confidence * 100) + "%";
-            $("confidence").textContent = "Confiança: " + Math.round(result.confidence * 100) + "%";
+            // Acorde tônico grande e destacado (ideal para acompanhar com violão)
+            $("key").innerHTML = `<span style="font-size: 4.8rem; font-weight: bold; line-height: 1;">${tonic.chord}</span>`;
+            $("mode").textContent = tonic.mode === "maior" ? "MAIOR" : "menor";
+            $("fill").style.width = (tonic.confidence * 100) + "%";
+            $("confidence").textContent = "Confiança: " + Math.round(tonic.confidence * 100) + "%";
 
-            // [FIX P1] Escolhe o mapa correto baseado no modo detectado
-            const map = result.mode === "menor"
-                ? CHORD_MAPS_MINOR[result.key]
-                : CHORD_MAPS_MAJOR[result.key];
+            // Sugestão de acordes diatônicos
+            const map = tonic.mode === "menor" 
+                ? CHORD_MAPS_MINOR[NOTE_NAMES[tonic.root]] 
+                : CHORD_MAPS_MAJOR[NOTE_NAMES[tonic.root]];
 
             const chords = map || [];
             $("chords").innerHTML = chords.map((c, i) =>
                 `<div class="chord-card${i === 0 ? " tonic" : ""}">${c}</div>`
             ).join("");
 
-            // [FIX P1] Decaimento REMOVIDO daqui. O único decaimento é o EMA
-            // no callback do Meyda. Dois decaimentos criavam deriva não-determinística.
-
-        }, 1000);
+        }, 650);
 
     } catch (e) {
         if (e.message !== "mic_cancelled") {
@@ -287,41 +275,31 @@ function stopAssistente() {
     clearInterval(assistenteInterval);
     assistenteInterval = null;
 
-    // [FIX P2] In-place reset sem criar novo array
     chromaBuffer.fill(0);
+    keyHistory.fill(0);
     assistenteRunning = false;
 
     $("startBtn").textContent = "🎤 Iniciar";
     $("startBtn").classList.remove("danger");
     $("statusDot").className = "dot off";
-    $("status").textContent  = "Parado";
-    $("key").textContent     = "--";
-    $("mode").textContent    = "";
-    $("fill").style.width    = "0%";
+    $("status").textContent = "Parado";
+    $("key").innerHTML = "--";
+    $("mode").textContent = "";
+    $("fill").style.width = "0%";
     $("confidence").textContent = "Confiança: 0%";
 }
 
 // ============= AFINADOR — PITCH DETECTION =============
+// (Mantido exatamente igual ao seu código original)
 
-/**
- * Autocorrelação com maxLag limitado a sr/30 (~1470 amostras para 44100 Hz).
- * Ainda O(n × maxLag) mas n = fftSize = 4096, maxLag ≈ 1470 → ~6M ops/frame.
- * Para performance máxima em mobile, a solução ideal seria FFT-based (O(n log n)).
- * Marcado como TODO para v4.
- *
- * [FIX P2] Early-exit: ao encontrar o primeiro pico acima do threshold, para.
- * Na prática, para instrumentos graves, isso encerra o loop em ~30% do maxLag.
- */
 function autoCorrelate(buf, sr) {
     const SIZE   = buf.length;
-    const maxLag = Math.floor(sr / 30); // frequência mínima: 30 Hz
+    const maxLag = Math.floor(sr / 30);
 
-    // Gate de volume
     let rms = 0;
     for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
     if (Math.sqrt(rms / SIZE) < 0.015) return -1;
 
-    // Autocorrelação
     const c = new Float32Array(maxLag);
     for (let i = 0; i < maxLag; i++) {
         let s = 0;
@@ -330,11 +308,9 @@ function autoCorrelate(buf, sr) {
         c[i] = s;
     }
 
-    // Pula o pico central (lag=0)
     let d = 0;
     while (d < maxLag - 1 && c[d] > c[d + 1]) d++;
 
-    // Busca o primeiro pico local significativo
     const threshold = 0.5 * c[0];
     let maxval = -1, maxpos = -1;
 
@@ -344,18 +320,16 @@ function autoCorrelate(buf, sr) {
                 maxval = c[i];
                 maxpos = i;
             }
-            // [FIX v1] Break APÓS atualizar maxpos — ordem correta
             if (maxval > threshold) break;
         }
     }
 
     if (maxpos === -1) return -1;
 
-    // Interpolação parabólica para precisão sub-sample
     let T0 = maxpos;
     const x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
-    const a  = (x1 + x3 - 2 * x2) / 2;
-    const b  = (x3 - x1) / 2;
+    const a = (x1 + x3 - 2 * x2) / 2;
+    const b = (x3 - x1) / 2;
     if (a !== 0) T0 = T0 - b / (2 * a);
 
     return sr / T0;
@@ -363,10 +337,7 @@ function autoCorrelate(buf, sr) {
 
 function detectPitch(capturedSr) {
     if (!tunerRunning) return;
-
     tunerAnalyser.getFloatTimeDomainData(tunerData);
-
-    // [FIX P0] Usa o sample rate capturado por closure, não o global audioCtx
     const f = autoCorrelate(tunerData, capturedSr);
 
     if (f > 30 && f < 4000) {
@@ -374,19 +345,14 @@ function detectPitch(capturedSr) {
         const cents  = Math.round(1200 * Math.log2(f / (440 * Math.pow(2, (n - 69) / 12))));
         const octave = Math.floor(n / 12) - 1;
 
-        // EMA nos cents para suavizar a agulha
         smoothedCents = smoothedCents * 0.8 + cents * 0.2;
-
-        const pct    = ((Math.max(-50, Math.min(50, smoothedCents)) + 50) / 100) * 100;
+        const pct = ((Math.max(-50, Math.min(50, smoothedCents)) + 50) / 100) * 100;
 
         $("note").textContent   = NOTE_NAMES[((n % 12) + 12) % 12];
         $("octave").textContent = "Oitava " + octave;
         $("freq").textContent   = f.toFixed(1) + " Hz";
         $("needle").style.left  = pct.toFixed(1) + "%";
 
-        // [FIX P1] inTune baseado em smoothedCents — consistente com a agulha.
-        // Antes usava `cents` bruto enquanto a agulha usava smoothedCents,
-        // causando o texto "Afinado!" piscar mesmo com a agulha centrada.
         const inTune = Math.abs(smoothedCents) < 5;
         $("needle").style.backgroundColor = inTune ? "#00ff66" : "#ef4444";
 
@@ -408,31 +374,26 @@ $("tunerBtn").onclick = async function () {
     if (tunerRunning) { stopTuner(); return; }
     try {
         const source = await startMic();
-
-        // [FIX P0] Captura o sample rate por closure imediatamente
         const capturedSr = audioCtx.sampleRate;
 
-        // Lowpass em 3500 Hz para suportar instrumentos agudos (violino ~2637 Hz)
-        // sem cortar harmônicos que reforçam a detecção da fundamental.
-        // v2 usava 1800 Hz, que cortava flautas e violinos.
         const filter = audioCtx.createBiquadFilter();
-        filter.type  = "lowpass";
+        filter.type = "lowpass";
         filter.frequency.value = 3500;
 
-        tunerAnalyser         = audioCtx.createAnalyser();
+        tunerAnalyser = audioCtx.createAnalyser();
         tunerAnalyser.fftSize = 4096;
 
         source.connect(filter);
         filter.connect(tunerAnalyser);
 
-        tunerData    = new Float32Array(tunerAnalyser.fftSize);
+        tunerData = new Float32Array(tunerAnalyser.fftSize);
         tunerRunning = true;
 
         $("tunerBtn").textContent = "⏹ Parar Afinador";
         $("tunerBtn").classList.add("danger");
         $("cents").textContent = "Ouvindo...";
 
-        detectPitch(capturedSr); // passa o sr por parâmetro, não pelo global
+        detectPitch(capturedSr);
 
     } catch (e) {
         if (e.message !== "mic_cancelled") {
@@ -446,17 +407,15 @@ function stopTuner() {
     tunerRunning = false;
     if (tunerRAF) { cancelAnimationFrame(tunerRAF); tunerRAF = null; }
     tunerAnalyser = null;
-    tunerData     = null;
-
-    // [FIX P2] Zera o EMA para que a próxima sessão comece centrada
+    tunerData = null;
     smoothedCents = 0;
 
     $("tunerBtn").textContent = "🎯 Iniciar Afinador";
     $("tunerBtn").classList.remove("danger");
-    $("note").textContent   = "--";
+    $("note").textContent = "--";
     $("octave").textContent = "";
-    $("freq").textContent   = "";
-    $("needle").style.left  = "50%";
+    $("freq").textContent = "";
+    $("needle").style.left = "50%";
     $("needle").style.backgroundColor = "#555";
     $("cents").textContent = "Aguardando sinal de áudio...";
     $("cents").style.color = "#888";

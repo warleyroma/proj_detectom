@@ -103,9 +103,12 @@ $("startBtn").onclick = async function() {
     });
     meydaAnalyser.start();
 
+    // Atualiza a tela a cada 1 segundo para parecer "tempo real"
     assistenteInterval = setInterval(function() {
+      // Verifica se há dados acumulados suficientes para não dar erro
       var total = chromaBuffer.reduce(function(a,b){ return a+b; }, 0);
-      if (total < 0.01) return;
+      if (total < 0.1) return; // Só calcula se realmente captou som
+
       var result = detectKey(chromaBuffer);
 
       $("key").textContent = result.key;
@@ -120,8 +123,11 @@ $("startBtn").onclick = async function() {
         return '<div class="chord-card' + (i === 0 ? " tonic" : "") + '">' + c + '</div>';
       }).join("");
 
-      chromaBuffer = chromaBuffer.map(function(v){ return v * 0.6; });
-    }, 3000);
+      // DECAIMENTO LENTO (0.90 ou 0.95):
+      // Isso faz o algoritmo "lembrar" das notas dos últimos ~10 segundos.
+      // Assim, ele junta o "Dó", o "Ré", e o "Mi" que o cantor fez na frase e entende a escala!
+      chromaBuffer = chromaBuffer.map(function(v){ return v * 0.90; });
+    }, 1000);
 
     assistenteRunning = true;
     $("startBtn").textContent = "⏹ Parar";

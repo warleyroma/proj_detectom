@@ -29,6 +29,31 @@ var smoothedCents = 0;
 
 function $(id) { return document.getElementById(id); }
 
+// ============= NAVEGAÇÃO DE TELAS =============
+
+$("btnAssistente").onclick = () => {
+    $("menu").classList.add("hidden");
+    $("assistente").classList.remove("hidden");
+};
+
+$("btnAfinador").onclick = () => {
+    $("menu").classList.add("hidden");
+    $("afinador").classList.remove("hidden");
+};
+
+$("btnVoltar1").onclick = () => {
+    stopAll(); // Desliga o microfone ao voltar
+    $("assistente").classList.add("hidden");
+    $("menu").classList.remove("hidden");
+};
+
+$("btnVoltar2").onclick = () => {
+    stopAll(); // Desliga o microfone ao voltar
+    $("afinador").classList.add("hidden");
+    $("menu").classList.remove("hidden");
+};
+
+
 // ============= UTILITÁRIOS DE ÁUDIO =============
 
 async function startMic() {
@@ -102,6 +127,12 @@ $("startBtn").onclick = async function() {
         });
         meydaAnalyser.start();
 
+        // UI Updates
+        $("statusDot").className = "dot on";
+        $("status").textContent = "Ouvindo...";
+        $("barWrap").style.display = "block";
+        $("chordsSection").style.display = "block";
+
         assistenteInterval = setInterval(() => {
             if (chromaBuffer.reduce((a,b)=>a+b,0) < 0.01) return;
             let result = detectKey(chromaBuffer);
@@ -119,7 +150,10 @@ $("startBtn").onclick = async function() {
         assistenteRunning = true;
         $("startBtn").textContent = "⏹ Parar";
         $("startBtn").classList.add("danger");
-    } catch(e) { console.error(e); }
+    } catch(e) { 
+        alert("Erro ao acessar o microfone! Aceite a permissão no navegador.");
+        console.error(e); 
+    }
 };
 
 function stopAssistente() {
@@ -127,8 +161,16 @@ function stopAssistente() {
     clearInterval(assistenteInterval);
     chromaBuffer.fill(0);
     assistenteRunning = false;
+    
+    // UI Resets
     $("startBtn").textContent = "🎤 Iniciar";
     $("startBtn").classList.remove("danger");
+    $("statusDot").className = "dot off";
+    $("status").textContent = "Parado";
+    $("key").textContent = "--";
+    $("mode").textContent = "";
+    $("fill").style.width = "0%";
+    $("confidence").textContent = "Confiança: 0%";
 }
 
 // ============= AFINADOR (PITCH DETECTION) =============
@@ -139,7 +181,7 @@ function autoCorrelate(buf, sr) {
     for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
     if (Math.sqrt(rms / SIZE) < 0.015) return -1;
 
-    let maxLag = Math.floor(sr / 30); // Limite p/ 30Hz (ajuda no Baixo e CPU)
+    let maxLag = Math.floor(sr / 30);
     let c = new Float32Array(maxLag).fill(0);
     for (let i = 0; i < maxLag; i++) {
         for (let j = 0; j < SIZE - i; j++) { c[i] += buf[j] * buf[j + i]; }
@@ -174,14 +216,27 @@ function detectPitch() {
     if (f > 30 && f < 4000) {
         let n = Math.round(12 * Math.log2(f / 440)) + 69;
         let cents = Math.round(1200 * Math.log2(f / (440 * Math.pow(2, (n - 69) / 12))));
+        let octave = Math.floor(n / 12) - 1;
         
         smoothedCents = (smoothedCents * 0.8) + (cents * 0.2);
         let pct = ((Math.max(-50, Math.min(50, smoothedCents)) + 50) / 100) * 100;
         
         $("note").textContent = NOTE_NAMES[((n % 12) + 12) % 12];
+        $("octave").textContent = "Oitava " + octave;
         $("freq").textContent = f.toFixed(1) + " Hz";
         $("needle").style.left = pct + "%";
-        $("needle").style.backgroundColor = Math.abs(cents) < 5 ? "#00ff66" : "#ef4444";
+        
+        let inTune = Math.abs(cents) < 5;
+        $("needle").style.backgroundColor = inTune ? "#00ff66" : "#ef4444";
+        
+        let centsEl = $("cents");
+        if (inTune) {
+            centsEl.textContent = "Afinado!";
+            centsEl.style.color = "#00ff66";
+        } else {
+            centsEl.textContent = (cents > 0 ? "+" : "") + cents + " cents";
+            centsEl.style.color = "#fff";
+        }
     }
     tunerRAF = requestAnimationFrame(detectPitch);
 }
@@ -195,7 +250,7 @@ $("tunerBtn").onclick = async function() {
         filter.frequency.value = 1800;
         
         tunerAnalyser = audioCtx.createAnalyser();
-        tunerAnalyser.fftSize = 4096; // 4096 é suficiente e mais leve
+        tunerAnalyser.fftSize = 4096;
         
         source.connect(filter);
         filter.connect(tunerAnalyser);
@@ -204,8 +259,12 @@ $("tunerBtn").onclick = async function() {
         tunerRunning = true;
         $("tunerBtn").textContent = "⏹ Parar Afinador";
         $("tunerBtn").classList.add("danger");
+        $("cents").textContent = "Ouvindo...";
         detectPitch();
-    } catch(e) { console.error(e); }
+    } catch(e) { 
+        alert("Erro ao acessar o microfone! Aceite a permissão no navegador.");
+        console.error(e); 
+    }
 };
 
 function stopTuner() {
@@ -215,5 +274,9 @@ function stopTuner() {
     $("tunerBtn").textContent = "🎯 Iniciar Afinador";
     $("tunerBtn").classList.remove("danger");
     $("note").textContent = "--";
+    $("octave").textContent = "";
+    $("freq").textContent = "";
     $("needle").style.left = "50%";
+    $("cents").textContent = "Aguardando sinal de áudio...";
+    $("cents").style.color = "#888";
 }

@@ -1,4 +1,8 @@
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 body {
   background: #000;
@@ -13,14 +17,32 @@ body {
   padding: 32px 24px;
 }
 
-.hidden { display: none !important; }
+.hidden {
+  display: none !important;
+}
 
-.emoji { font-size: 48px; margin-bottom: 12px; }
+.emoji {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
 
-h1 { font-size: 28px; font-weight: bold; color: #00ff66; }
-h2 { font-size: 22px; font-weight: bold; }
+h1 {
+  font-size: 28px;
+  font-weight: bold;
+  color: #00ff66;
+}
 
-.sub { font-size: 13px; color: #555; margin-top: 6px; margin-bottom: 24px; }
+h2 {
+  font-size: 22px;
+  font-weight: bold;
+}
+
+.sub {
+  font-size: 13px;
+  color: #555;
+  margin-top: 6px;
+  margin-bottom: 24px;
+}
 
 button {
   width: 100%;
@@ -35,10 +57,22 @@ button {
   cursor: pointer;
   transition: background 0.15s;
 }
-button:hover { background: #009938; }
-button:active { background: #008830; }
-button.danger { background: #b91c1c; }
-button.danger:hover { background: #dc2626; }
+
+button:hover {
+  background: #009938;
+}
+
+button:active {
+  background: #008830;
+}
+
+button.danger {
+  background: #b91c1c;
+}
+
+button.danger:hover {
+  background: #dc2626;
+}
 
 .voltar {
   width: auto;
@@ -54,7 +88,11 @@ button.danger:hover { background: #dc2626; }
   align-items: center;
   gap: 6px;
 }
-.voltar:hover { background: #00ff6611; color: white; }
+
+.voltar:hover {
+  background: #00ff6611;
+  color: white;
+}
 
 .status-row {
   display: flex;
@@ -67,15 +105,28 @@ button.danger:hover { background: #dc2626; }
 }
 
 .dot {
-  width: 8px; height: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #333;
   display: inline-block;
 }
-.dot.on { background: #00ff66; animation: pulse 1.2s infinite; }
+
+.dot.on {
+  background: #00ff66;
+  animation: pulse 1.2s infinite;
+}
+
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
 }
 
 .card {
@@ -93,9 +144,16 @@ button.danger:hover { background: #dc2626; }
   line-height: 1;
 }
 
-#mode { font-size: 13px; color: #888; margin-top: 4px; min-height: 18px; }
+#mode {
+  font-size: 13px;
+  color: #888;
+  margin-top: 4px;
+  min-height: 18px;
+}
 
-.bar-wrap { margin-top: 16px; }
+.bar-wrap {
+  margin-top: 16px;
+}
 
 .bar {
   height: 8px;
@@ -112,7 +170,11 @@ button.danger:hover { background: #dc2626; }
   transition: width 0.7s;
 }
 
-.conf-text { font-size: 12px; color: #555; margin-top: 6px; }
+.conf-text {
+  font-size: 12px;
+  color: #555;
+  margin-top: 6px;
+}
 
 .label {
   font-size: 11px;
@@ -152,12 +214,28 @@ button.danger:hover { background: #dc2626; }
   line-height: 1;
   transition: color 0.3s;
 }
-.note-big.intune { color: #00ff66; }
 
-.octave { font-size: 13px; color: #555; margin-top: 4px; min-height: 18px; }
-.freq-text { font-size: 18px; color: #888; margin-top: 8px; min-height: 24px; }
+.note-big.intune {
+  color: #00ff66;
+}
 
-.meter-wrap { padding: 4px 0 0; }
+.octave {
+  font-size: 13px;
+  color: #555;
+  margin-top: 4px;
+  min-height: 18px;
+}
+
+.freq-text {
+  font-size: 18px;
+  color: #888;
+  margin-top: 8px;
+  min-height: 24px;
+}
+
+.meter-wrap {
+  padding: 4px 0 0;
+}
 
 .meter {
   position: relative;
@@ -188,7 +266,7 @@ button.danger:hover { background: #dc2626; }
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  transition: left 0.1s, background 0.2s;
+  transition: left 0.15s ease-out, background-color 0.2s ease;
 }
 
 .scale {
@@ -206,7 +284,11 @@ button.danger:hover { background: #dc2626; }
   margin-top: 12px;
   min-height: 20px;
 }
-.cents-text.intune { color: #00ff66; font-weight: 600; }
+
+.cents-text.intune {
+  color: #00ff66;
+  font-weight: 600;
+}
 
 .strings-grid {
   display: grid;
@@ -214,5 +296,13 @@ button.danger:hover { background: #dc2626; }
   gap: 6px;
 }
 
-.str-note { font-size: 14px; font-weight: bold; color: #00ff66; }
-.str-oct  { font-size: 11px; color: #444; }
+.str-note {
+  font-size: 14px;
+  font-weight: bold;
+  color: #00ff66;
+}
+
+.str-oct {
+  font-size: 11px;
+  color: #444;
+}

@@ -32,6 +32,7 @@ var tunerAnalyser = null;
 var tunerData = null;
 var tunerRAF = null;
 var tunerRunning = false;
+var smoothedCents = 0;
 
 // ============= HELPERS =============
 
@@ -230,6 +231,8 @@ function detectPitch() {
         $("note").className = "note-big" + (inTune ? " intune" : "");
         $("octave").textContent = "Oitava " + nd.octave;
         $("freq").textContent = f.toFixed(1) + " Hz";
+
+        smoothedCents = (smoothedCents * 0.8) + (nd.cents * 0.2);
 
         var pct = ((Math.max(-50, Math.min(50, nd.cents)) + 50) / 100) * 100;
         $("needle").style.left = pct + "%";

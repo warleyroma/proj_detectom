@@ -157,13 +157,13 @@ function stopAssistente() {
 function autoCorrelate(buf, sampleRate) {
   var SIZE = buf.length;
   
-  // 1. Cálculo de RMS (Energia do sinal) para ignorar silêncio
+  // 1. Calcula o RMS (volume). Ignora se for muito baixo (silêncio/ruído).
   var rms = 0;
   for (var i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
   rms = Math.sqrt(rms / SIZE);
-  if (rms < 0.01) return -1; // Silêncio ou ruído de fundo
+  if (rms < 0.01) return -1;
 
-  // 2. Autocorrelação padrão (sem destruir o buffer)
+  // 2. Faz a Autocorrelação
   var c = new Float32Array(SIZE).fill(0);
   for (var i = 0; i < SIZE; i++) {
     for (var j = 0; j < SIZE - i; j++) {
@@ -171,20 +171,33 @@ function autoCorrelate(buf, sampleRate) {
     }
   }
 
-  // 3. Encontrar o primeiro pico real (ignora a descida inicial do sinal)
+  // 3. Pula o "escorregador" inicial (lag 0)
   var d = 0;
-  while (c[d] > c[d + 1]) d++;
-  
-  var maxval = -1, maxpos = -1;
-  for (var i = d; i < SIZE; i++) {
-    if (c[i] > maxval) {
-      maxval = c[i];
-      maxpos = i;
+  while (d < SIZE - 1 && c[d] > c[d + 1]) d++;
+
+  // 4. A MAGIA PARA O BAIXO: Procurar o Primeiro Pico Significativo
+  var maxval = -1;
+  var maxpos = -1;
+  var threshold = 0.5 * c[0]; // O pico precisa ter pelo menos 50% da energia original
+
+  for (var i = d; i < SIZE - 1; i++) {
+    // Verifica se é um pico local (maior que o vizinho da esquerda e da direita)
+    if (c[i] > c[i - 1] && c[i] > c[i + 1]) {
+      if (c[i] > maxval) {
+        maxval = c[i];
+        maxpos = i;
+      }
+      // Se achou um pico forte o suficiente, PARA! É a fundamental do baixo.
+      if (maxval > threshold) {
+        break;
+      }
     }
   }
+
+  if (maxpos === -1) return -1;
   var T0 = maxpos;
 
-  // 4. Interpolação Parabólica (aumenta MUITO a precisão dos "cents")
+  // 5. Interpolação Parabólica (Garante a precisão cirúrgica para notas Agudas)
   var x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
   var a = (x1 + x3 - 2 * x2) / 2;
   var b = (x3 - x1) / 2;

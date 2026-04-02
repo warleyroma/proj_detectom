@@ -242,7 +242,7 @@ $("tunerBtn").onclick = async function() {
     tunerCtx = new AudioContext();
     var source = tunerCtx.createMediaStreamSource(stream);
     tunerAnalyser = tunerCtx.createAnalyser();
-    tunerAnalyser.fftSize = 4096;
+    tunerAnalyser.fftSize = 8192;
     source.connect(tunerAnalyser);
     tunerData = new Float32Array(tunerAnalyser.fftSize);
     tunerRunning = true;

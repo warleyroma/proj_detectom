@@ -6,66 +6,92 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
 <div class="container">
 
   <!-- MENU -->
   <div id="menu">
-    <h1>🎸 Assistente Musical</h1>
+    <div class="emoji">🎸</div>
+    <h1>Assistente Musical</h1>
+    <p class="sub">Detecte acordes e afine sua guitarra</p>
     <button id="btnAssistente">🎸 Assistente</button>
     <button id="btnAfinador">🎯 Afinador</button>
   </div>
 
   <!-- ASSISTENTE -->
   <div id="assistente" class="hidden">
-    <button id="btnVoltar1">⬅️ Voltar</button>
-    <h2>🎸 Assistente</h2>
+    <button id="btnVoltar1" class="voltar">← Voltar</button>
+    <div class="emoji">🎸</div>
+    <h2>Assistente</h2>
+    <p class="sub">Detecta tonalidade e acordes</p>
 
-    <button id="startBtn">Iniciar</button>
+    <button id="startBtn">🎤 Iniciar</button>
 
-    <div id="status">Status: parado</div>
-    <div id="key">--</div>
-    <div id="confidence">Confiança: --</div>
-
-    <div class="bar">
-      <div class="fill" id="fill"></div>
+    <div class="status-row">
+      <span id="statusDot" class="dot off"></span>
+      <span id="status">Parado</span>
     </div>
 
-    <div id="chords"></div>
+    <div class="card">
+      <div id="key">--</div>
+      <div id="mode"></div>
+      <div class="bar-wrap" id="barWrap" style="display:none">
+        <div class="bar"><div class="fill" id="fill"></div></div>
+        <div id="confidence" class="conf-text">Confiança: 0%</div>
+      </div>
+    </div>
+
+    <div id="chordsSection" style="display:none">
+      <div class="label">Acordes da tonalidade</div>
+      <div id="chords" class="chords-grid"></div>
+    </div>
   </div>
 
   <!-- AFINADOR -->
   <div id="afinador" class="hidden">
-    <button id="btnVoltar2">⬅️ Voltar</button>
-    <h2>🎯 Afinador</h2>
+    <button id="btnVoltar2" class="voltar">← Voltar</button>
+    <div class="emoji">🎯</div>
+    <h2>Afinador</h2>
+    <p class="sub">Afine sua guitarra com precisão</p>
 
-    <button id="tunerBtn">Iniciar Afinador</button>
+    <button id="tunerBtn">🎯 Iniciar Afinador</button>
 
-    <div id="note">--</div>
-    <div id="freq">-- Hz</div>
-
-    <div class="meter">
-      <div class="center-line"></div>
-      <div id="needle"></div>
+    <div class="card">
+      <div id="note" class="note-big">--</div>
+      <div id="octave" class="octave"></div>
+      <div id="freq" class="freq-text"></div>
     </div>
 
-    <div class="scale">
-      <span>-50</span>
-      <span>-20</span>
-      <span>0</span>
-      <span>+20</span>
-      <span>+50</span>
+    <div class="card">
+      <div class="meter-wrap">
+        <div class="meter">
+          <div class="center-line"></div>
+          <div id="needle"></div>
+        </div>
+      </div>
+      <div class="scale">
+        <span>-50</span><span>-20</span><span>0</span><span>+20</span><span>+50</span>
+      </div>
+      <div id="cents" class="cents-text">Aguardando sinal de áudio...</div>
     </div>
 
-    <div id="cents">0 cents</div>
+    <div class="card">
+      <div class="label">Afinação padrão</div>
+      <div class="strings-grid">
+        <div><div class="str-note">E</div><div class="str-oct">2</div></div>
+        <div><div class="str-note">A</div><div class="str-oct">2</div></div>
+        <div><div class="str-note">D</div><div class="str-oct">3</div></div>
+        <div><div class="str-note">G</div><div class="str-oct">3</div></div>
+        <div><div class="str-note">B</div><div class="str-oct">3</div></div>
+        <div><div class="str-note">E</div><div class="str-oct">4</div></div>
+      </div>
+    </div>
   </div>
 
 </div>
 
 <script src="https://unpkg.com/meyda/dist/web/meyda.min.js"></script>
 <script src="script.js"></script>
-
 </body>
 </html>

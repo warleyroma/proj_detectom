@@ -88,11 +88,17 @@ $("startBtn").onclick = async function() {
     meydaAnalyser = Meyda.createMeydaAnalyzer({
       audioContext: ctx,
       source: source,
-      bufferSize: 1024,
-      featureExtractors: ["chroma"],
+      bufferSize: 2048, // Aumentei um pouco para estabilizar graves e voz
+      featureExtractors: ["chroma", "rms"], // <-- ADICIONADO "rms"
       callback: function(f) {
         if (!f || !f.chroma) return;
-        for (var i = 0; i < 12; i++) chromaBuffer[i] += f.chroma[i];
+        
+        // NOISE GATE: Só acumula o chroma se o volume for audível
+        if (f.rms < 0.015) return; 
+
+        for (var i = 0; i < 12; i++) {
+            chromaBuffer[i] += f.chroma[i];
+        }
       }
     });
     meydaAnalyser.start();
@@ -142,36 +148,43 @@ function stopAssistente() {
 
 // ============= AFINADOR =============
 
-function autoCorrelate(buf, sr) {
+function autoCorrelate(buf, sampleRate) {
+  var SIZE = buf.length;
+  
+  // 1. Cálculo de RMS (Energia do sinal) para ignorar silêncio
   var rms = 0;
-  for (var i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
-  if (Math.sqrt(rms / buf.length) < 0.01) return -1;
+  for (var i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+  rms = Math.sqrt(rms / SIZE);
+  if (rms < 0.01) return -1; // Silêncio ou ruído de fundo
 
-  var r1 = 0, r2 = buf.length - 1;
-  for (var i = 0; i < buf.length / 2; i++) {
-    if (Math.abs(buf[i]) < 0.2) { r1 = i; break; }
+  // 2. Autocorrelação padrão (sem destruir o buffer)
+  var c = new Float32Array(SIZE).fill(0);
+  for (var i = 0; i < SIZE; i++) {
+    for (var j = 0; j < SIZE - i; j++) {
+      c[i] += buf[j] * buf[j + i];
+    }
   }
-  for (var i = 1; i < buf.length / 2; i++) {
-    if (Math.abs(buf[buf.length - i]) < 0.2) { r2 = buf.length - i; break; }
-  }
 
-  var clip = buf.slice(r1, r2 + 1);
-  var len = clip.length;
-  var corr = new Float32Array(len);
-  for (var lag = 0; lag < len; lag++)
-    for (var i = 0; i < len - lag; i++)
-      corr[lag] += clip[i] * clip[i + lag];
-
+  // 3. Encontrar o primeiro pico real (ignora a descida inicial do sinal)
   var d = 0;
-  while (d < len && corr[d] > corr[d + 1]) d++;
-  var maxC = -Infinity, shift = d;
-  for (var i = d; i < len; i++) if (corr[i] > maxC) maxC = corr[i];
-  for (var i = d; i < len; i++) if (corr[i] > 0.98 * maxC) { shift = i; break; }
+  while (c[d] > c[d + 1]) d++;
+  
+  var maxval = -1, maxpos = -1;
+  for (var i = d; i < SIZE; i++) {
+    if (c[i] > maxval) {
+      maxval = c[i];
+      maxpos = i;
+    }
+  }
+  var T0 = maxpos;
 
-  var x0 = shift > 0 ? corr[shift - 1] : corr[shift];
-  var x2 = shift < len - 1 ? corr[shift + 1] : corr[shift];
-  var refined = shift + (x2 - x0) / (2 * (2 * corr[shift] - x0 - x2) + 0.0001);
-  return sr / refined;
+  // 4. Interpolação Parabólica (aumenta MUITO a precisão dos "cents")
+  var x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+  var a = (x1 + x3 - 2 * x2) / 2;
+  var b = (x3 - x1) / 2;
+  if (a) T0 = T0 - b / (2 * a);
+
+  return sampleRate / T0;
 }
 
 function getNoteData(freq) {
